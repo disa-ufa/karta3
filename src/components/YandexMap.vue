@@ -29,7 +29,6 @@
 
     <div id="map" ref="mapRef" style="width: 100vw; height: 100vh; position: relative;"></div>
 
-    <!-- Ошибка загрузки -->
     <div v-if="loadError" class="map-error">
       <div>{{ loadError }}</div>
       <button class="retry-btn" @click="loadOrganizationsFromApi">Повторить</button>
@@ -39,6 +38,7 @@
     <transition name="sidebar">
       <SidebarCard v-if="selectedOrg" :org="selectedOrg" @close="selectedOrg = null" />
     </transition>
+
     <div
       v-if="hoveredOrg"
       :style="previewCardStyle"
@@ -59,11 +59,11 @@
   </div>
 </template>
 
-
 <script setup>
 import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import LeftPanel from './LeftPanel.vue'
 import SidebarCard from './SidebarCard.vue'
+import { API_BASE } from '@/apiBase'
 
 const MINISTRY_SOCIAL = "Министерство семьи, труда и социальной защиты населения Р.Б."
 
@@ -74,9 +74,9 @@ const accessibility = reactive([])
 const svo = reactive([])
 
 const visibleLayers = reactive({
-  layer1_1: true, // Муниципальные ОО
-  layer1_2: true, // Коррекционные ОО
-  layer1_3: true, // ПМПК
+  layer1_1: true,
+  layer1_2: true,
+  layer1_3: true,
   layer2: true,
   layer3: true,
   layer4: true,
@@ -106,12 +106,7 @@ const allOrganizations = ref([])
 const isLoading = ref(false)
 const loadError = ref(null)
 
-function debugLog(...args) {
-  if (import.meta.env.DEV) {
-    console.log(...args)
-  }
-}
-
+function debugLog(...args) { if (import.meta.env.DEV) console.log(...args) }
 
 function getLayerIdByOrg(org) {
   const dep = (org.department || org.vedomstva || '').trim();
@@ -122,12 +117,9 @@ function getLayerIdByOrg(org) {
     if (Array.isArray(org.profile)) podvList = podvList.concat(org.profile);
     else if (typeof org.profile === 'string') podvList.push(org.profile);
     podvList = podvList.map(x => (x || '').toLowerCase());
-
     if (podvList.some(v => v.includes('коррекц'))) return 'layer1_2';
     if (podvList.some(v => v.includes('пмпк'))) return 'layer1_3';
     if (podvList.some(v => v.includes('муницип'))) return 'layer1_1';
-
-    // Если не найдено ни одного ключа — не показываем
     return null;
   }
   if (dep === 'Министерство спорта Р.Б.') return 'layer2';
@@ -137,14 +129,11 @@ function getLayerIdByOrg(org) {
   return null;
 }
 
-
-
-
 async function loadOrganizationsFromApi() {
   isLoading.value = true
   loadError.value = null
   try {
-    const res = await fetch('http://136.169.171.150:8888/api/organizations')
+    const res = await fetch(`${API_BASE}/organizations`)
     if (!res.ok) throw new Error('Ошибка сервера: ' + res.status)
 
     const data = await res.json()
@@ -153,25 +142,19 @@ async function loadOrganizationsFromApi() {
       if (mapInstance) mapInstance.geoObjects.remove(objectManagers[key])
       delete objectManagers[key]
     }
+
     const layersData = {
       layer1_1: [], layer1_2: [], layer1_3: [],
       layer2: [], layer3: [], layer4: [], layer5: []
     }
+
     data.forEach(org => {
-      debugLog('[ORGANIZATION]', org)
       const layer = getLayerIdByOrg(org)
       if (!layer) return
-      layersData[layer].push({
-        ...org,
-        layer,
-        coords: org.coords
-      })
-      allOrganizations.value.push({
-        ...org,
-        layer,
-        coords: org.coords
-      })
+      layersData[layer].push({ ...org, layer, coords: org.coords })
+      allOrganizations.value.push({ ...org, layer, coords: org.coords })
     })
+
     for (const layerId in layersData) {
       if (!objectManagers[layerId]) {
         objectManagers[layerId] = new window.ymaps.ObjectManager({ clusterize: true })
@@ -184,6 +167,7 @@ async function loadOrganizationsFromApi() {
           geometry: { type: 'Point', coordinates: org.coords },
           properties: { ...org }
         }))
+
       offsetDuplicateCoords(features)
       objectManagers[layerId].removeAll && objectManagers[layerId].removeAll()
       objectManagers[layerId].add({ type: 'FeatureCollection', features })
@@ -191,6 +175,7 @@ async function loadOrganizationsFromApi() {
       objectManagers[layerId].objects.options.set('hasBalloon', false)
       objectManagers[layerId].objects.options.set('openBalloonOnClick', false)
       objectManagers[layerId].objects.options.set('hasHint', false)
+
       objectManagers[layerId].objects.events.add('mouseenter', (e) => {
         const objectId = e.get('objectId')
         const geoObject = objectManagers[layerId].objects.getById(objectId)
@@ -236,10 +221,7 @@ function offsetDuplicateCoords(features) {
         const angle = (i * 30) * Math.PI / 180
         const dx = Math.cos(angle) * OFFSET
         const dy = Math.sin(angle) * OFFSET
-        group[i].geometry.coordinates = [
-          lon + dx,
-          lat + dy
-        ]
+        group[i].geometry.coordinates = [lon + dx, lat + dy]
       }
     }
   }
@@ -256,16 +238,14 @@ function filterFeature(obj) {
   }
   const accVal = (obj.properties.accessibility || '').toLowerCase().trim()
   const svoVal = (obj.properties.svo || '').toLowerCase().trim()
-  let ageOk = true, accOk = true, svoOk = true
 
   const ageFilter = Array.isArray(ageGroups) ? [...ageGroups] : []
-  if (ageFilter.length > 0) ageOk = ageFilter.some(group => ageArr.includes(group.toLowerCase()))
-
   const accFilter = Array.isArray(accessibility) ? [...accessibility] : []
-  if (accFilter.length > 0) accOk = accFilter.some(val => accVal === val.toLowerCase().trim())
-
   const svoFilter = Array.isArray(svo) ? [...svo] : []
-  if (svoFilter.length > 0) svoOk = svoFilter.includes('Да') ? (svoVal === 'да') : true
+
+  const ageOk = ageFilter.length > 0 ? ageFilter.some(group => ageArr.includes(group.toLowerCase())) : true
+  const accOk = accFilter.length > 0 ? accFilter.some(val => accVal === val.toLowerCase().trim()) : true
+  const svoOk  = svoFilter.length  > 0 ? (svoFilter.includes('Да') ? (svoVal === 'да') : true) : true
 
   return ageOk && accOk && svoOk
 }
@@ -284,9 +264,7 @@ function addLayerWithFilter(layerId) {
   }
 }
 function removeLayer(layerId) {
-  if (objectManagers[layerId]) {
-    mapInstance.geoObjects.remove(objectManagers[layerId])
-  }
+  if (objectManagers[layerId]) mapInstance.geoObjects.remove(objectManagers[layerId])
 }
 watch([ageGroups, accessibility, svo], applyFiltersToAllLayers, { deep: true })
 watch(visibleLayers, (newValues) => {
@@ -308,12 +286,7 @@ const previewCardStyle = computed(() => ({
   minWidth: '280px'
 }))
 function openPreviewCard(props, coords) {
-  hoveredOrg.value = {
-    name: props.name,
-    address: props.address,
-    website: props.website,
-    phone: props.phone
-  }
+  hoveredOrg.value = { name: props.name, address: props.address, website: props.website, phone: props.phone }
   previewCoords.value = coords
 }
 function handleSelectOrganization(org) {
@@ -321,9 +294,7 @@ function handleSelectOrganization(org) {
   for (const layerId in objectManagers) {
     const om = objectManagers[layerId]
     const feats = om.objects.getAll()
-    foundFeature = feats.find(f =>
-      f.properties.name === org.name && f.properties.address === org.address
-    )
+    foundFeature = feats.find(f => f.properties.name === org.name && f.properties.address === org.address)
     if (foundFeature) { foundLayer = om; break }
   }
   if (foundFeature && foundLayer && mapInstance) {
@@ -336,7 +307,7 @@ function handleSelectOrganization(org) {
 function initMap() {
   window.ymaps.ready(async () => {
     await nextTick()
-    if (!mapRef.value) { console.error('mapRef ещё не готов!'); return }
+    if (!mapRef.value) return
     mapInstance = new window.ymaps.Map(mapRef.value, {
       center: [54.7, 56.0],
       zoom: 7,
@@ -353,8 +324,6 @@ onMounted(() => {
   document.head.appendChild(script)
 })
 </script>
-
-
 
 
 

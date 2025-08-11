@@ -2,6 +2,7 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AuthModal from './AuthModal.vue'
+import { API_BASE } from '@/apiBase'
 
 const LAYER_GROUPS = [
   {
@@ -50,35 +51,20 @@ const localAgeGroups = ref([...props.ageGroups])
 const localAccessibilityEnabled = ref(props.accessibility.includes('Да'))
 const svoEnabled = ref(!!(props.svo && props.svo.includes('Да')))
 
-watch(() => props.ageGroups, val => {
-  localAgeGroups.value = [...val]
-})
-watch(() => props.accessibility, val => {
-  localAccessibilityEnabled.value = val.includes('Да')
-})
-watch(() => props.svo, val => {
-  svoEnabled.value = !!(val && val.includes('Да'))
-})
+watch(() => props.ageGroups, val => { localAgeGroups.value = [...val] })
+watch(() => props.accessibility, val => { localAccessibilityEnabled.value = val.includes('Да') })
+watch(() => props.svo, val => { svoEnabled.value = !!(val && val.includes('Да')) })
 
 function toggleLocalAgeGroup(val) {
   const arr = [...localAgeGroups.value]
-  if (arr.includes(val)) {
-    if (arr.length > 1) arr.splice(arr.indexOf(val), 1)
-  } else {
-    arr.push(val)
-  }
+  if (arr.includes(val)) { if (arr.length > 1) arr.splice(arr.indexOf(val), 1) }
+  else { arr.push(val) }
   localAgeGroups.value = arr
 }
-function toggleAccessibility() {
-  localAccessibilityEnabled.value = !localAccessibilityEnabled.value
-}
-function toggleSvo() {
-  svoEnabled.value = !svoEnabled.value
-}
+const toggleAccessibility = () => { localAccessibilityEnabled.value = !localAccessibilityEnabled.value }
+const toggleSvo = () => { svoEnabled.value = !svoEnabled.value }
 function applyFilters() {
-  if (localAgeGroups.value.length === 0) {
-    localAgeGroups.value = [...ageGroupsOptions]
-  }
+  if (localAgeGroups.value.length === 0) localAgeGroups.value = [...ageGroupsOptions]
   emit('update:ageGroups', localAgeGroups.value)
   emit('update:accessibility', localAccessibilityEnabled.value ? ['Да'] : [])
   emit('update:svo', svoEnabled.value ? ['Да'] : [])
@@ -108,7 +94,7 @@ const userType = ref('')
 const isLoggedIn = computed(() => !!token.value)
 
 function loadUser() {
-  token.value = localStorage.getItem('token') || localStorage.getItem('user_token') || ''
+  token.value = localStorage.getItem('user_token') || localStorage.getItem('token') || ''
   userEmail.value = localStorage.getItem('user_email') || ''
   userType.value = localStorage.getItem('auth_type') || localStorage.getItem('user_type') || ''
 }
@@ -119,19 +105,13 @@ const isLoginTab = ref(true)
 const authError = ref('')
 const authLoading = ref(false)
 
-function openAuth() {
-  showAuthModal.value = true
-  isLoginTab.value = true
-}
-function closeAuth() {
-  showAuthModal.value = false
-  authError.value = ''
-}
+const openAuth = () => { showAuthModal.value = true; isLoginTab.value = true }
+const closeAuth = () => { showAuthModal.value = false; authError.value = '' }
 
 async function handleLogin({ email, password }) {
   authLoading.value = true
   try {
-    const response = await fetch('/api/login', {
+    const response = await fetch(`${API_BASE}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -140,9 +120,8 @@ async function handleLogin({ email, password }) {
     if (!response.ok) {
       authError.value = data?.error || 'Ошибка входа'
     } else {
-      // сохраняем ВСЕ ключи совместимости
-      localStorage.setItem('token', data.token)
       localStorage.setItem('user_token', data.token)
+      localStorage.setItem('token', data.token)
       localStorage.setItem('auth_type', data.type || '')
       localStorage.setItem('user_type', data.type || '')
       localStorage.setItem('user_email', email)
@@ -156,23 +135,16 @@ async function handleLogin({ email, password }) {
       if (data.type === 'ministry-admin') router.push('/ministry-admin-profile')
       else router.push('/profile')
     }
-  } catch (e) {
+  } catch {
     authError.value = 'Ошибка соединения с сервером'
   } finally {
     authLoading.value = false
   }
 }
-
-function handleRegister() {
-  showAuthModal.value = false
-}
-function switchAuthTab(val) {
-  isLoginTab.value = val
-  authError.value = ''
-}
+const handleRegister = () => { showAuthModal.value = false }
+const switchAuthTab = (val) => { isLoginTab.value = val; authError.value = '' }
 
 function logout() {
-  // чистим все варианты ключей
   localStorage.removeItem('token')
   localStorage.removeItem('user_token')
   localStorage.removeItem('auth_type')
@@ -182,13 +154,9 @@ function logout() {
   loadUser()
   router.push('/')
 }
-
 function goToProfile() {
-  if (userType.value === 'ministry-admin') {
-    router.push('/ministry-admin-profile')
-  } else {
-    router.push('/profile')
-  }
+  if (userType.value === 'ministry-admin') router.push('/ministry-admin-profile')
+  else router.push('/profile')
 }
 
 /* ---------- поиск ---------- */
@@ -209,14 +177,8 @@ function handleSearchInput(e) {
   emit('search', searchInput.value)
   showDropdown.value = !!searchInput.value.trim()
 }
-function clearSearch() {
-  searchInput.value = ''
-  emit('search', '')
-  showDropdown.value = false
-}
-function onFocusSearch() {
-  if (searchInput.value.trim()) showDropdown.value = true
-}
+function clearSearch() { searchInput.value = ''; emit('search', ''); showDropdown.value = false }
+function onFocusSearch() { if (searchInput.value.trim()) showDropdown.value = true }
 function selectOrgFromDropdown(org) {
   emit('selectOrg', org)
   showDropdown.value = false
@@ -225,31 +187,23 @@ function selectOrgFromDropdown(org) {
 
 /* ---------- чекбоксы ведомства ---------- */
 const LAYER1_KEYS = ['layer1_1', 'layer1_2', 'layer1_3']
-const allLayer1Checked = computed(() =>
-  LAYER1_KEYS.every(key => props.visibleLayers[key])
-)
-const someLayer1Checked = computed(() =>
-  LAYER1_KEYS.some(key => props.visibleLayers[key])
-)
+const allLayer1Checked = computed(() => LAYER1_KEYS.every(key => props.visibleLayers[key]))
+const someLayer1Checked = computed(() => LAYER1_KEYS.some(key => props.visibleLayers[key]))
 function toggleAllLayer1(e) {
   const val = e.target.checked
-  LAYER1_KEYS.forEach(key => {
-    props.visibleLayers[key] = val
-  })
+  LAYER1_KEYS.forEach(key => { props.visibleLayers[key] = val })
 }
 </script>
 
 <template>
   <transition name="fade">
     <div class="panel" v-show="true">
-      <!-- Кнопка свернуть -->
       <button class="collapse-btn" @click="$emit('collapse')" title="Свернуть панель">
         <svg width="20" height="20" viewBox="0 0 20 20">
           <path d="M13 5l-6 5 6 5" stroke="#666" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
 
-      <!-- Авторизация и ЛК -->
       <template v-if="!isLoggedIn">
         <button class="reset-btn auth-link" @click="openAuth">Вход / Регистрация</button>
       </template>
@@ -354,11 +308,7 @@ function toggleAllLayer1(e) {
       <div class="panel-section">
         <br />
         <div class="section-title">Доступная среда</div>
-        <button
-          @click="toggleAccessibility"
-          :class="['accessibility-btn', { selected: localAccessibilityEnabled }]"
-          type="button"
-        >
+        <button @click="toggleAccessibility" :class="['accessibility-btn', { selected: localAccessibilityEnabled }]" type="button">
           Да
         </button>
       </div>
@@ -366,22 +316,13 @@ function toggleAllLayer1(e) {
       <div class="panel-section">
         <br />
         <div class="section-title">Участник СВО</div>
-        <button
-          @click="toggleSvo"
-          :class="['svo-btn', { selected: svoEnabled }]"
-          type="button"
-        >
+        <button @click="toggleSvo" :class="['svo-btn', { selected: svoEnabled }]" type="button">
           Да
         </button>
       </div>
 
       <div class="actions">
-        <button
-          class="btn-apply"
-          :class="{ disabled: !hasChanges }"
-          :disabled="!hasChanges"
-          @click="applyFilters"
-        >
+        <button class="btn-apply" :class="{ disabled: !hasChanges }" :disabled="!hasChanges" @click="applyFilters">
           Применить
         </button>
       </div>
@@ -403,91 +344,44 @@ function toggleAllLayer1(e) {
 </template>
 
 <style scoped>
-.svo-btn {
-  border: 1.5px solid #a1aeb8;
-  border-radius: 8px;
-  padding: 5px 16px;
-  background: #f5f6fa;
-  color: #333;
-  font-size: 15px;
-  cursor: pointer;
-  margin-top: 6px;
-  outline: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.svo-btn.selected { background: #e5ffe6; color: #36c900; border-color: #36c900; font-weight: bold; }
-
-.profile-bar-minimal { display: flex; align-items: center; gap: 5px; margin-bottom: 14px; }
-.profile-icon-btn, .logout-icon-btn {
-  background: none; border: none; padding: 3px 4px; border-radius: 8px; cursor: pointer;
-  display: flex; align-items: center; transition: background 0.14s;
-}
-.profile-icon-btn:hover { background: #eaf2ff; }
-.logout-icon-btn:hover { background: #ffeaea; }
-.profile-icon-btn svg, .logout-icon-btn svg { display: block; }
-
-.panel {
-  position: absolute; top: 20px; left: 20px; width: 320px; background: #fff; border-radius: 16px;
-  box-shadow: 0 4px 24px 0 rgba(51, 61, 81, 0.07); padding: 22px 20px 20px 20px;
-  font-family: 'Segoe UI','Arial',sans-serif; z-index: 20; border: 1px solid #e5e5e5;
-  transition: all 0.3s ease-in-out;
-}
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-.collapse-btn {
-  position: absolute; top: 12px; right: 12px; background: #fff; border-radius: 9px; border: 1px solid #ddd;
-  width: 36px; height: 36px; z-index: 2001; box-shadow: 0 2px 12px #0001; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: background 0.15s;
-}
-.collapse-btn:hover { background: #f3f6ff; }
-
-.parent-checkbox { font-weight: 600; margin-bottom: 4px; }
-.child-checkbox { margin-left: 22px; font-weight: 400; }
-.checkbox-children { margin-bottom: 5px; }
-input[type="checkbox"]:indeterminate { accent-color: #a5a5a5 !important; }
-
-.section-title { font-weight: 500; font-size: 15px; margin-bottom: 4px; }
-.checkbox-row { display: block; margin-bottom: 3px; font-size: 15px; }
-.age-checkbox-row { display: flex; gap: 16px; }
-.checkbox-inline { display: flex; align-items: center; gap: 5px; font-size: 15px; }
-
-.accessibility-btn {
-  border: 1.5px solid #a1aeb8; border-radius: 8px; padding: 5px 16px; background: #f5f6fa; color: #333;
-  font-size: 15px; cursor: pointer; margin-top: 6px; outline: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.accessibility-btn.selected { background: #e5ffe6; color: #36c900; border-color: #36c900; font-weight: bold; }
-
-.panel-divider { border: none; border-top: 1px solid #eaeaea; margin: 12px 0; }
-
-.actions { margin-top: 16px; display: flex; justify-content: space-between; }
-.btn-apply {
-  padding: 8px 16px; font-size: 15px; cursor: pointer; border-radius: 8px; border: none; background-color: #36c900; color: white;
-  opacity: 1; transition: opacity 0.2s, background 0.15s;
-}
-.btn-apply.disabled, .btn-apply:disabled { background-color: #e5e5e5 !important; color: #aaa !important; cursor: not-allowed; opacity: 1; }
-
-/* поиск */
-.search-bar {
-  position: relative; display: flex; align-items: center; background: #fafbfc; border-radius: 22px; padding: 0 14px; margin: 16px; height: 44px;
-  box-shadow: 0 2px 8px 0 #24252912;
-}
-.search-input { border: none; outline: none; background: transparent; font-size: 16px; flex: 1; height: 40px; padding-left: 0; }
-.search-icon { display: flex; align-items: center; justify-content: center; margin-left: 8px; margin-right: 2px; cursor: pointer; }
-.search-clear { cursor: pointer; font-size: 18px; color: #bbb; margin-left: 3px; }
-.search-clear:hover { color: #ff3b3b; }
-.search-dropdown {
-  position: absolute; left: 0; top: 44px; background: #fff; border-radius: 13px; box-shadow: 0 2px 12px rgba(0,0,0,0.09);
-  width: 100%; z-index: 30; max-height: 520px; overflow-y: auto;
-}
-.search-item { padding: 9px 14px; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
-.search-item:last-child { border-bottom: none; }
-.search-item:hover { background: #f4f9fd; }
-.search-item-title { font-weight: 500; display: block; color: #222; font-size: 15px; }
-.search-item-address { display: block; font-size: 13px; color: #888; }
-.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.panel-title { font-weight: 600; font-size: 18px; }
-.reset-btn { font-size: 14px; background: none; border: none; color: #999; cursor: pointer; transition: color 0.18s; margin-left: 8px; padding: 0; }
-.reset-btn:hover { color: #36c900; text-decoration: underline; }
+/* стили как были */
+.svo-btn{border:1.5px solid #a1aeb8;border-radius:8px;padding:5px 16px;background:#f5f6fa;color:#333;font-size:15px;cursor:pointer;margin-top:6px;outline:none;transition:background .15s,border-color .15s,color .15s}
+.svo-btn.selected{background:#e5ffe6;color:#36c900;border-color:#36c900;font-weight:bold}
+.profile-bar-minimal{display:flex;align-items:center;gap:5px;margin-bottom:14px}
+.profile-icon-btn,.logout-icon-btn{background:none;border:none;padding:3px 4px;border-radius:8px;cursor:pointer;display:flex;align-items:center;transition:background .14s}
+.profile-icon-btn:hover{background:#eaf2ff}.logout-icon-btn:hover{background:#ffeaea}
+.profile-icon-btn svg,.logout-icon-btn svg{display:block}
+.panel{position:absolute;top:20px;left:20px;width:320px;background:#fff;border-radius:16px;box-shadow:0 4px 24px 0 rgba(51,61,81,.07);padding:22px 20px 20px;font-family:'Segoe UI','Arial',sans-serif;z-index:20;border:1px solid #e5e5e5;transition:all .3s ease-in-out}
+.fade-enter-active,.fade-leave-active{transition:opacity .25s}.fade-enter-from,.fade-leave-to{opacity:0}
+.collapse-btn{position:absolute;top:12px;right:12px;background:#fff;border-radius:9px;border:1px solid #ddd;width:36px;height:36px;z-index:2001;box-shadow:0 2px 12px #0001;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s}
+.collapse-btn:hover{background:#f3f6ff}
+.parent-checkbox{font-weight:600;margin-bottom:4px}
+.child-checkbox{margin-left:22px;font-weight:400}
+.checkbox-children{margin-bottom:5px}
+input[type="checkbox"]:indeterminate{accent-color:#a5a5a5!important}
+.section-title{font-weight:500;font-size:15px;margin-bottom:4px}
+.checkbox-row{display:block;margin-bottom:3px;font-size:15px}
+.age-checkbox-row{display:flex;gap:16px}
+.checkbox-inline{display:flex;align-items:center;gap:5px;font-size:15px}
+.accessibility-btn{border:1.5px solid #a1aeb8;border-radius:8px;padding:5px 16px;background:#f5f6fa;color:#333;font-size:15px;cursor:pointer;margin-top:6px;outline:none;transition:background .15s,border-color .15s,color .15s}
+.accessibility-btn.selected{background:#e5ffe6;color:#36c900;border-color:#36c900;font-weight:bold}
+.panel-divider{border:none;border-top:1px solid #eaeaea;margin:12px 0}
+.actions{margin-top:16px;display:flex;justify-content:space-between}
+.btn-apply{padding:8px 16px;font-size:15px;cursor:pointer;border-radius:8px;border:none;background-color:#36c900;color:white;opacity:1;transition:opacity .2s,background .15s}
+.btn-apply.disabled,.btn-apply:disabled{background-color:#e5e5e5!important;color:#aaa!important;cursor:not-allowed;opacity:1}
+.search-bar{position:relative;display:flex;align-items:center;background:#fafbfc;border-radius:22px;padding:0 14px;margin:16px;height:44px;box-shadow:0 2px 8px 0 #24252912}
+.search-input{border:none;outline:none;background:transparent;font-size:16px;flex:1;height:40px;padding-left:0}
+.search-icon{display:flex;align-items:center;justify-content:center;margin-left:8px;margin-right:2px;cursor:pointer}
+.search-clear{cursor:pointer;font-size:18px;color:#bbb;margin-left:3px}
+.search-clear:hover{color:#ff3b3b}
+.search-dropdown{position:absolute;left:0;top:44px;background:#fff;border-radius:13px;box-shadow:0 2px 12px rgba(0,0,0,.09);width:100%;z-index:30;max-height:520px;overflow-y:auto}
+.search-item{padding:9px 14px;cursor:pointer;border-bottom:1px solid #f1f1f1}
+.search-item:last-child{border-bottom:none}
+.search-item:hover{background:#f4f9fd}
+.search-item-title{font-weight:500;display:block;color:#222;font-size:15px}
+.search-item-address{display:block;font-size:13px;color:#888}
+.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.panel-title{font-weight:600;font-size:18px}
+.reset-btn{font-size:14px;background:none;border:none;color:#999;cursor:pointer;transition:color .18s;margin-left:8px;padding:0}
+.reset-btn:hover{color:#36c900;text-decoration:underline}
 </style>

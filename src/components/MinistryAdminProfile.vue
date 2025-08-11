@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { API_BASE } from '@/apiBase'
 
 import OrganizationTable from './AdminProfile/OrganizationTable.vue'
 import SearchBox from './AdminProfile/SearchBox.vue'
@@ -48,11 +49,7 @@ const SPECIALIST_OPTIONS = {
     "Заведующий методическим кабинетом МАУ \"Бураевский РДК им. Р. Галиевой\"",
     "Культорганизатор", "Художественный руководитель", "Приглашенные психологи"
   ],
-  "Министерство спорта Р.Б.": [
-    "Тренер-преподаватель",
-    "Инструктор-методист",
-    "Педагог-психолог"
-  ]
+  "Министерство спорта Р.Б.": ["Тренер-преподаватель", "Инструктор-методист", "Педагог-психолог"]
 }
 
 const admin = ref({
@@ -71,7 +68,7 @@ const originalOrgs = ref([])
 const origFP = ref({})
 
 const router = useRouter()
-function goHome() { router.push('/') }
+const goHome = () => router.push('/')
 
 /* ===== Утилиты ===== */
 const toArr = (v) =>
@@ -88,22 +85,19 @@ const parseCoords = (input) => {
   return [parseFloat(nums[0]), parseFloat(nums[1])]
 }
 
-// coords -> строка
 function normalizeCoords(c) {
-  if (Array.isArray(c)) {
-    return c.filter(v => v !== null && v !== undefined).join(', ')
-  }
+  if (Array.isArray(c)) return c.filter(v => v != null).join(', ')
   if (c && typeof c === 'object') {
     const lat = c.lat ?? c.latitude ?? c[0]
     const lon = c.lng ?? c.lon ?? c.long ?? c.longitude ?? c[1]
-    if (lat != null && lon != null) return `${lat}, ${lon}`
-    return ''
+    return (lat != null && lon != null) ? `${lat}, ${lon}` : ''
   }
   return (c ?? '').toString().trim()
 }
 
 function getToken() {
   return (
+    localStorage.getItem('user_token') ||
     localStorage.getItem('token') ||
     localStorage.getItem('authToken') ||
     localStorage.getItem('auth_token') ||
@@ -117,7 +111,7 @@ const authHeaders = () => {
   return t ? { Authorization: `Bearer ${t}` } : {}
 }
 
-function rowKey(o) { return o && (o._id ?? o.id) }
+const rowKey = (o) => o && (o._id ?? o.id)
 function comparable(org) {
   return {
     name: N(org.name),
@@ -134,13 +128,13 @@ function comparable(org) {
     specialists: toArr(org.specialists).map(N).sort()
   }
 }
-const fp = obj => JSON.stringify(obj)
+const fp = (obj) => JSON.stringify(obj)
 function setOrigFingerprint(org) {
   const key = String(rowKey(org))
   origFP.value[key] = fp(comparable(org))
 }
 
-// ====== Кнопка «Сохранить» ======
+/* ====== Кнопка «Сохранить» ====== */
 function isOrgChanged(_idx, org) {
   const key = rowKey(org)
   if (key == null) return false
@@ -148,10 +142,10 @@ function isOrgChanged(_idx, org) {
   if (original == null) return false
   return fp(comparable(org)) !== original
 }
-async function saveOrg(org, _idx) {
+async function saveOrg(org) {
   const token = getToken()
   if (!token) {
-    alert('Вы не авторизованы как ведомственный администратор. Войдите через /api/login и сохраните токен в localStorage (ключ "token").')
+    alert('Вы не авторизованы как ведомственный администратор. Войдите и сохраните токен в localStorage (ключ "user_token").')
     return
   }
 
@@ -175,7 +169,7 @@ async function saveOrg(org, _idx) {
       department: org.department,
     }
 
-    const res = await fetch(`/api/ministry-admin/organization/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${API_BASE}/ministry-admin/organization/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(payload),
@@ -185,7 +179,6 @@ async function saveOrg(org, _idx) {
       throw new Error(`HTTP ${res.status}: ${t || res.statusText}`)
     }
 
-    // Успех — обновляем «оригинал», кнопка погаснет
     setOrigFingerprint(org)
     const k = rowKey(org)
     const i = originalOrgs.value.findIndex(o => rowKey(o) === k)
@@ -195,15 +188,15 @@ async function saveOrg(org, _idx) {
   }
 }
 
-// ----------------- Загрузка организаций -----------------
+/* ----------------- Загрузка организаций ----------------- */
 async function loadOrganizationsForMinistry(ministry) {
   organizations.value = []
   error.value = ''
   loading.value = true
   try {
     let url = ''
-    if (ministry === "Министерство культуры Р.Б.") url = '/api/organizations?department=Министерство%20культуры%20Р.Б.'
-    else if (ministry === "Министерство спорта Р.Б.") url = '/api/organizations?department=Министерство%20спорта%20Р.Б.'
+    if (ministry === "Министерство культуры Р.Б.") url = `${API_BASE}/organizations?department=${encodeURIComponent('Министерство культуры Р.Б.')}`
+    else if (ministry === "Министерство спорта Р.Б.") url = `${API_BASE}/organizations?department=${encodeURIComponent('Министерство спорта Р.Б.')}`
     else return
 
     const resp = await fetch(url)

@@ -67,13 +67,15 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import OrganizationTable from './AdminProfile/OrganizationTable.vue'
 import LoadingBar from './AdminProfile/LoadingBar.vue'
+import { API_BASE } from '@/apiBase' // ← единая база API
 
 const props = defineProps({ search: { type: String, default: '' } })
 const emit = defineEmits(['count'])
 
 /* ----- таблица ----- */
 const tableProps = reactive({
-  columnWidths: [48, 250, 250, 210, 160, 150, 150, 80, 80, 80, 220, 400, 350, 100],
+  //            ID  Кратк  Полное  Адрес  Коорд Тел   Сайт  Возр СВО  Дост Проф  Услуги  Спец  Кноп
+  columnWidths: [48, 250,   250,    210,   160,  150,  150,  80,  80,  80,  220,  400,  350,  100],
   profileOptions: [],
   serviceOptions: [],
   specialistOptions: [],
@@ -111,8 +113,10 @@ const parseCoords = (input) => {
 }
 
 function getToken() {
-  // пробуем несколько ключей — вдруг логин писал в другой
+  // основной ключ:
   return (
+    localStorage.getItem('user_token') ||
+    // обратная совместимость со старыми ключами:
     localStorage.getItem('token') ||
     localStorage.getItem('authToken') ||
     localStorage.getItem('auth_token') ||
@@ -224,7 +228,7 @@ function isOrgChanged(_idx, org) {
 async function saveOrg(org) {
   const token = getToken()
   if (!token) {
-    alert('Вы не авторизованы как ведомственный администратор. Войдите через /api/login и сохраните токен в localStorage (ключ "token").')
+    alert('Вы не авторизованы как ведомственный администратор. Войдите и убедитесь, что токен сохранён в localStorage (ключ "user_token").')
     return
   }
 
@@ -249,7 +253,7 @@ async function saveOrg(org) {
       podvedomstva: org.podvedomstva ?? org.podvedomstvo,
     }
 
-    const res = await fetch(`/api/ministry-admin/organization/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${API_BASE}/ministry-admin/organization/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(payload),
@@ -271,7 +275,7 @@ async function loadAllForMinistry() {
   error.value = ''
   try {
     const department = 'Министерство просвещения Р.Б.'
-    const url = `/api/organizations?department=${encodeURIComponent(department)}`
+    const url = `${API_BASE}/organizations?department=${encodeURIComponent(department)}`
     const resp = await fetch(url)
     if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
     const data = await resp.json()

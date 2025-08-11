@@ -10,18 +10,16 @@
         <span v-if="org.rating" class="sidebar-rating-value">{{ org.rating }}</span>
         <span v-if="org.ratingCount" class="sidebar-rating-count">({{ org.ratingCount }} оценок)</span>
       </div>
-  
-<div class="sidebar-section" v-if="org.address"><b>Адрес:</b> {{ org.address }}</div>
-<div class="sidebar-section" v-if="org.phone"><b>Телефон:</b> {{ org.phone }}</div>
-<div class="sidebar-section" v-if="org.website">
-  <b>Сайт:</b> <a :href="org.website" target="_blank">{{ org.website }}</a>
-</div>
-<div class="sidebar-section" v-if="org.rehab_form"><b>Форма:</b> {{ org.rehab_form }}</div>
-<div class="sidebar-section" v-if="org.age_group"><b>Возрастная группа:</b> {{ org.age_group }}</div>
-<div class="sidebar-section" v-if="org.accessibility"><b>Доступная среда:</b> {{ org.accessibility }}</div>
 
-      
-      <!-- ПРОФИЛЬ КАК СПИСОК -->
+      <div class="sidebar-section" v-if="org.address"><b>Адрес:</b> {{ org.address }}</div>
+      <div class="sidebar-section" v-if="org.phone"><b>Телефон:</b> {{ org.phone }}</div>
+      <div class="sidebar-section" v-if="org.website">
+        <b>Сайт:</b> <a :href="org.website" target="_blank">{{ org.website }}</a>
+      </div>
+      <div class="sidebar-section" v-if="org.rehab_form"><b>Форма:</b> {{ org.rehab_form }}</div>
+      <div class="sidebar-section" v-if="org.age_group"><b>Возрастная группа:</b> {{ org.age_group }}</div>
+      <div class="sidebar-section" v-if="org.accessibility"><b>Доступная среда:</b> {{ org.accessibility }}</div>
+
       <div class="sidebar-section">
         <b>Профиль:</b>
         <ul v-if="org.profile">
@@ -43,19 +41,13 @@
   </div>
 </template>
 
+
 <script setup>
 defineProps(['org'])
 defineEmits(['close'])
-
-// Универсальный парсер для разных вариантов формата (строка или массив)
 function parseList(val) {
-  if (Array.isArray(val)) {
-    return val.filter(Boolean)
-  }
-  if (typeof val === 'string') {
-    // делим по \n или запятым, точкам с запятой — если нужно, можно подправить
-    return val.split(/\n|,|;/).map(x => x.trim()).filter(Boolean)
-  }
+  if (Array.isArray(val)) return val.filter(Boolean)
+  if (typeof val === 'string') return val.split(/\n|,|;/).map(x => x.trim()).filter(Boolean)
   return []
 }
 </script>
