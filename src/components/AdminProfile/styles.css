@@ -1,0 +1,248 @@
+/* ---- Общие сбросы для таблицы ---- */
+.org-table,
+.org-table th,
+.org-table td,
+textarea.cell-area,
+input.cell-input {
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+/* ---- Общая таблица ---- */
+.org-table {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fafdff;
+  min-width: 1800px;
+  width: max-content;
+}
+
+/* ---- Ячейки ---- */
+.org-table th,
+.org-table td {
+  border: 1px solid #eaeaea !important;
+  position: relative;
+  vertical-align: top;     /* содержимое по верху */
+  overflow: hidden;
+
+  /* строки/ячейки больше не фиксированной высоты */
+  height: auto;
+  min-height: 44px;
+  max-height: none;
+}
+
+/* ---- Шапка ---- */
+.org-table th {
+  background: #f3f8fb !important;
+  background-clip: padding-box;
+  position: sticky !important;
+  top: 0;
+  z-index: 10;
+  user-select: none;
+  font-weight: 600;
+}
+
+/* ---- Контейнер для скролла ---- */
+.table-scroll-sticky {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100vh;
+  overflow-x: auto;
+  overflow-y: auto;
+  background: #fafbfc;
+  border-radius: 9px;
+  box-shadow: 0 2px 14px #0001;
+}
+
+/* ---- Тело таблицы ---- */
+.org-table tbody tr {
+  height: auto;
+  min-height: 44px;
+  max-height: none;
+}
+
+/* ---- Редактируемые ячейки ---- */
+.org-table td.editable-cell {
+  padding: 0 !important;          /* чтобы поля заполняли всю ячейку */
+  margin: 0 !important;
+  vertical-align: top !important;
+  position: relative;             /* база для абсолютного позиционирования textarea */
+}
+
+/* ---- textarea и input для таблицы ---- */
+textarea.cell-area,
+input.cell-input {
+  width: 100% !important;
+  font-size: 15px !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  background: transparent !important;
+}
+
+/* textarea заполняет ячейку полностью */
+textarea.cell-area {
+  position: absolute;           /* растягиваем по ячейке */
+  top: 0;
+  left: 0;
+  right: 6px;                   /* 6px под перетяжку-колонку, чтобы не наезжать */
+  bottom: 0;
+  width: auto !important;
+  height: auto !important;
+  min-height: 44px;
+  padding: 6px 8px !important;
+  resize: vertical !important;  /* можно тянуть вручную */
+  overflow: auto;
+}
+
+/* input компактный и прижат к верхнему краю */
+input.cell-input {
+  height: auto !important;
+  min-height: 32px;
+  padding: 6px 8px !important;
+}
+
+/* Фокусировка */
+.cell-input:focus,
+.cell-area:focus {
+  background: #e9fff1 !important;
+}
+
+/* ---- Курсоры для изменения размеров ---- */
+.col-resize, .row-resize {
+  position: absolute;
+  user-select: none;
+  z-index: 1000;
+  background: transparent;
+}
+
+.col-resize {
+  width: 6px;
+  top: 0;
+  right: 0;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.row-resize {
+  width: 100%;
+  height: 6px;
+  bottom: 0;
+  left: 0;
+  cursor: row-resize;
+}
+
+.col-resize:hover,
+.row-resize:hover {
+  background: #d0ebff;
+}
+
+/* ---- Стиль для чекбоксов и радио ---- */
+.age-group-box,
+.acc-radio-box {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 2px;
+}
+
+.agelabel {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ---- Кнопка сохранения ---- */
+.save-btn {
+  padding: 7px 15px;
+  border-radius: 6px;
+  background: #36c900;
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.16s, opacity 0.15s;
+}
+.save-btn.inactive,
+.save-btn:disabled {
+  background: #b9e4b9;
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+/* ---- Остальное оформление ---- */
+.admin-profile-full {
+  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  background: #f4faf7;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 101;
+}
+
+.close-btn-modern {
+  position: absolute;
+  top: 24px;
+  right: 32px;
+  background: rgba(255,255,255,0.95);
+  border-radius: 50%;
+  box-shadow: 0 2px 12px #0002;
+  border: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: box-shadow 0.18s, background 0.2s;
+  z-index: 30;
+  padding: 0;
+}
+.close-btn-modern:hover {
+  background: #ffeaea;
+  box-shadow: 0 4px 24px #b33b3b30;
+}
+
+.ministry-line, .orgs-title {
+  padding: 18px 36px 0 36px;
+  font-size: 18px;
+  flex: none;
+}
+
+.orgs-title {
+  margin: 2px 0 10px 36px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.table-container-flex {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.loading-bar {
+  margin: 50px auto;
+  font-size: 20px;
+  text-align: center;
+  color: #666;
+}
+
+.modal-error {
+  color: #f33;
+  font-size: 15px;
+  margin: 14px 0;
+  text-align: center;
+}
