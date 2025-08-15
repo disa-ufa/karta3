@@ -11,13 +11,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'switchTab', 'logged-in'])
 
+/* ------ Вход ------ */
 const loginEmail = ref('')
 const loginPassword = ref('')
 const localError = ref('')
 
-const registrationTab = ref('org') // org | ministry
-
-const regName = ref('')
+/* ------ Регистрация только для админов ведомства ------ */
 const regMinistry = ref('')
 const regContactName = ref('')
 const regContactPhone = ref('')
@@ -31,8 +30,6 @@ watch(() => props.show, show => {
     loginEmail.value = ''
     loginPassword.value = ''
     localError.value = ''
-    registrationTab.value = 'org'
-    regName.value = ''
     regMinistry.value = ''
     regContactName.value = ''
     regContactPhone.value = ''
@@ -77,7 +74,6 @@ async function handleLogin() {
       return
     }
 
-    // сохраняем во всех совместимых ключах
     localStorage.setItem('user_token', data.token || '')
     localStorage.setItem('token', data.token || '')
     localStorage.setItem('auth_type', data.type || '')
@@ -85,6 +81,8 @@ async function handleLogin() {
     localStorage.setItem('user_email', loginEmail.value.trim())
     if (data.type === 'ministry-admin' && data.ministry) {
       localStorage.setItem('user_ministry', data.ministry)
+    } else {
+      localStorage.removeItem('user_ministry')
     }
 
     emit('logged-in', { type: data.type, ministry: data.ministry || null })
@@ -95,15 +93,11 @@ async function handleLogin() {
   }
 }
 
-/* --------------- РЕГИСТРАЦИЯ ---------------- */
+/* --------------- РЕГИСТРАЦИЯ (админ ведомства) ---------------- */
 async function handleRegister() {
   localError.value = ''
   registrationSuccess.value = false
 
-  if (registrationTab.value === 'org' && !regName.value) {
-    localError.value = 'Введите наименование организации'
-    return
-  }
   if (!regMinistry.value) {
     localError.value = 'Выберите ведомство'
     return
@@ -127,9 +121,8 @@ async function handleRegister() {
     contactPhone: regContactPhone.value,
     email: regEmail.value,
     password: regPassword.value,
-    isMinistryAdmin: registrationTab.value === 'ministry'
+    isMinistryAdmin: true
   }
-  if (registrationTab.value === 'org') body.orgName = regName.value
 
   try {
     const response = await fetch(`${API_BASE}/register-request`, {
@@ -156,6 +149,7 @@ async function handleRegister() {
         <button :class="{active: isLogin}" @click="$emit('switchTab', true)">Вход</button>
         <button :class="{active: !isLogin}" @click="$emit('switchTab', false)">Регистрация</button>
       </div>
+
       <div class="modal-content">
         <!-- Вход -->
         <form v-if="isLogin" @submit.prevent="handleLogin" autocomplete="on">
@@ -166,24 +160,23 @@ async function handleRegister() {
           <div v-else-if="error" class="modal-error">{{ error }}</div>
         </form>
 
-        <!-- Регистрация -->
+        <!-- Регистрация (только администратор ведомства) -->
         <template v-else>
-          <div class="register-tabs">
-            <button :class="['reg-tab', {active: registrationTab === 'org'}]" @click="registrationTab = 'org'" type="button">
-              Организация
-            </button>
-            <button :class="['reg-tab', {active: registrationTab === 'ministry'}]" @click="registrationTab = 'ministry'" type="button">
-              Администратор ведомства
-            </button>
-          </div>
           <form @submit.prevent="handleRegister" v-if="!registrationSuccess">
-            <input v-if="registrationTab === 'org'" type="text" v-model="regName" placeholder="Наименование организации" required />
             <select v-model="regMinistry" required>
               <option value="" disabled>Выберите ведомство</option>
               <option v-for="m in ministries" :key="m" :value="m">{{ m }}</option>
             </select>
             <input type="text" v-model="regContactName" placeholder="ФИО контактного лица" required />
-            <input type="tel" v-model="regContactPhone" @input="onPhoneInput" maxlength="18" placeholder="+7 (___) ___-__-__" required autocomplete="tel" />
+            <input
+              type="tel"
+              v-model="regContactPhone"
+              @input="onPhoneInput"
+              maxlength="18"
+              placeholder="+7 (___) ___-__-__"
+              required
+              autocomplete="tel"
+            />
             <input type="email" v-model="regEmail" placeholder="E-mail" required />
             <input type="password" v-model="regPassword" placeholder="Пароль" required />
             <input type="password" v-model="regPasswordRepeat" placeholder="Повторите пароль" required />
@@ -191,23 +184,20 @@ async function handleRegister() {
             <div v-if="localError" class="modal-error">{{ localError }}</div>
             <div v-else-if="error" class="modal-error">{{ error }}</div>
           </form>
+
           <div v-if="registrationSuccess" class="modal-success">
-            Заявка принята и будет рассмотрена модератором.<br>
+            Заявка принята и будет рассмотрена модератором.<br />
             Результат будет отправлен на email.
           </div>
         </template>
       </div>
+
       <button class="close-btn" @click="$emit('close')">×</button>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* стили без изменений */
-.register-tabs{display:flex;gap:10px;margin-bottom:12px;justify-content:center}
-.reg-tab{background:#e7eef6;border:none;border-radius:7px;padding:7px 16px;font-size:15px;color:#797c8a;font-weight:500;cursor:pointer}
-.reg-tab.active{background:#f2faff;color:#2962ff}
-.reg-tab[disabled]{pointer-events:none;opacity:.45}
 .modal-overlay{position:fixed;inset:0;background:rgba(51,61,81,.20);z-index:9999;display:flex;align-items:center;justify-content:center}
 .auth-modal{background:#fff;border-radius:14px;box-shadow:0 8px 48px rgba(60,80,100,.19);padding:28px 28px 20px;width:370px;position:relative}
 .tabs{display:flex;justify-content:center;margin-bottom:18px;gap:10px}
