@@ -1,9 +1,7 @@
 {
   "version": 2,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "http://136.169.171.150:8888/api/$1"
-    }
+    { "source": "/api/:path*", "destination": "http://136.169.171.150:8888/api/:path*" },
+    { "source": "/(.*)", "destination": "/" }
   ]
 }
