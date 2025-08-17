@@ -9,7 +9,6 @@ import ErrorBar from './AdminProfile/ErrorBar.vue'
 import LoadingBar from './AdminProfile/LoadingBar.vue'
 import EducationMinistryTabs from './EducationMinistryTabs.vue'
 
-/* ===== Яндекс.Карты для кнопки геокодирования в таблице ===== */
 function ensureYMaps() {
   if (typeof window === 'undefined' || window.ymaps) return
   const key = import.meta.env.VITE_YA_GEOCODER_KEY || '9dda63a0-a400-4fa1-bed5-024c6ad2056d'
@@ -74,8 +73,8 @@ const error = ref('')
 const loading = ref(false)
 const search = ref('')
 
-//            ID  Кратк Полное Адрес Коорд Тел  Сайт Возр СВО  Дост Проф  Усл   Спец  Кноп
-const columnWidths = ref([48, 250, 250, 210, 160, 105, 100, 80, 80, 80, 220, 250, 350, 100])
+//            ID  Кратк  Полное  Адрес  Коорд  Тел   Сайт  Возр  СВО  Дост  Проф  Услуги  Спец  Действия
+const columnWidths = ref([48, 250, 250, 210, 160, 105, 120, 80, 80, 90, 220, 250, 350, 130])
 
 const originalOrgs = ref([])
 const origFP = ref({})
@@ -83,7 +82,6 @@ const origFP = ref({})
 const router = useRouter()
 const goHome = () => router.push('/')
 
-/* ===== Утилиты ===== */
 const toArr = (v) =>
   Array.isArray(v) ? v :
   (typeof v === 'string' ? v.split(/[,;|\n]+/).map(s => s.trim()).filter(Boolean) : [])
@@ -147,7 +145,6 @@ function setOrigFingerprint(org) {
   origFP.value[key] = fp(comparable(org))
 }
 
-/* ====== Кнопка «Сохранить» ====== */
 function isOrgChanged(_idx, org) {
   const key = rowKey(org)
   if (key == null) return false
@@ -155,17 +152,16 @@ function isOrgChanged(_idx, org) {
   if (original == null) return false
   return fp(comparable(org)) !== original
 }
+
 async function saveOrg(org) {
   const token = getToken()
   if (!token) {
     alert('Вы не авторизованы как ведомственный администратор. Войдите и сохраните токен в localStorage (ключ "user_token").')
     return
   }
-
   try {
     const id = org._id || org.id
     if (!id) throw new Error('Нет ID организации')
-
     const payload = {
       name: org.name ?? '',
       full_name: org.full_name ?? '',
@@ -181,7 +177,6 @@ async function saveOrg(org) {
       specialists: toArr(org.specialists),
       department: org.department,
     }
-
     const res = await fetch(`${API_BASE}/ministry-admin/organization/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -191,18 +186,96 @@ async function saveOrg(org) {
       const t = await res.text().catch(() => '')
       throw new Error(`HTTP ${res.status}: ${t || res.statusText}`)
     }
-
     setOrigFingerprint(org)
     const k = rowKey(org)
     const i = originalOrgs.value.findIndex(o => rowKey(o) === k)
     if (i !== -1) originalOrgs.value[i] = JSON.parse(JSON.stringify(org))
+    const j = organizations.value.findIndex(o => rowKey(o) === k)
+    if (j !== -1) organizations.value[j] = { ...organizations.value[j] }
   } catch (e) {
     alert('Не удалось сохранить: ' + (e.message || e))
   }
 }
 
-/* ----------------- Загрузка организаций ----------------- */
-/* Универсально: для любого министерства, кроме Просвещения, грузим по department=ministry */
+async function createOrg(draft) {
+  const token = getToken()
+  if (!token) {
+    alert('Вы не авторизованы как ведомственный администратор. Войдите и сохраните токен в localStorage (ключ "user_token").')
+    return
+  }
+  try {
+    const payload = {
+      name: draft.name ?? '',
+      full_name: draft.full_name ?? '',
+      address: draft.address ?? '',
+      coords: parseCoords(draft.coords),
+      phone: draft.phone ?? '',
+      website: draft.website ?? '',
+      ageGroups: (draft.ageGroups || []),
+      svo: N(draft.svo) === 'да' ? 'да' : 'нет',
+      accessibility: N(draft.accessibility) === 'да' ? 'да' : 'нет',
+      profile: (draft.profile || []),
+      services: (draft.services || []),
+      specialists: (draft.specialists || []),
+      department: admin.value.ministry,
+    }
+    const res = await fetch(`${API_BASE}/ministry-admin/organization`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${t || res.statusText}`)
+    }
+    const created = await res.json()
+    const normalized = {
+      ...created,
+      id: created._id || created.id,
+      coords: normalizeCoords(created.coords),
+      profile: created.profile || [],
+      services: created.services || [],
+      specialists: created.specialists || [],
+      ageGroups: created.ageGroups || [],
+      svo: N(created.svo) === 'да' ? 'да' : 'нет',
+      accessibility: N(created.accessibility) === 'да' ? 'да' : 'нет',
+    }
+    organizations.value = [normalized, ...organizations.value]
+    originalOrgs.value = [JSON.parse(JSON.stringify(normalized)), ...originalOrgs.value]
+    setOrigFingerprint(normalized)
+  } catch (e) {
+    alert('Не удалось создать: ' + (e.message || e))
+  }
+}
+
+async function deleteOrg(org) {
+  if (!org) return
+  if (!confirm(`Удалить организацию «${org.name || '(без названия)'}»?`)) return
+  const token = getToken()
+  if (!token) {
+    alert('Вы не авторизованы как ведомственный администратор. Войдите и сохраните токен в localStorage (ключ "user_token").')
+    return
+  }
+  try {
+    const id = org._id || org.id
+    if (!id) throw new Error('Нет ID организации')
+    const res = await fetch(`${API_BASE}/ministry-admin/organization/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { ...authHeaders() },
+    })
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${t || res.statusText}`)
+    }
+    const k = String(id)
+    organizations.value = organizations.value.filter(o => String(rowKey(o)) !== k)
+    originalOrgs.value = originalOrgs.value.filter(o => String(rowKey(o)) !== k)
+    delete origFP.value[k]
+  } catch (e) {
+    alert('Не удалось удалить: ' + (e.message || e))
+  }
+}
+
 async function loadOrganizationsForMinistry(ministry) {
   organizations.value = []
   error.value = ''
@@ -212,19 +285,17 @@ async function loadOrganizationsForMinistry(ministry) {
     const resp = await fetch(url)
     if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
     const json = await resp.json()
-
     organizations.value = json.map((org, i) => ({
       ...org,
       id: org._id || org.id || (i + 1),
       coords: normalizeCoords(org.coords),
-      profile: toArr(org.profile),
-      services: toArr(org.services),
-      specialists: toArr(org.specialists),
+      profile: org.profile || [],
+      services: org.services || [],
+      specialists: org.specialists || [],
       ageGroups: org.ageGroups || [],
       svo: N(org.svo) === 'да' ? 'да' : 'нет',
       accessibility: N(org.accessibility) === 'да' ? 'да' : 'нет',
     }))
-
     originalOrgs.value = organizations.value.map(o => JSON.parse(JSON.stringify(o)))
     origFP.value = {}
     organizations.value.forEach(setOrigFingerprint)
@@ -249,7 +320,6 @@ const filteredOrgs = computed(() => {
   })
 })
 
-/* === СЧЁТЧИК ДЛЯ ПРОСВЕЩЕНИЯ === */
 const eduCount = ref(0)
 const onTabCount = (n) => { eduCount.value = n }
 const countToShow = computed(() =>
@@ -303,6 +373,8 @@ onMounted(async () => {
           :ageOptions="AGE_OPTIONS"
           :isOrgChanged="isOrgChanged"
           @saveOrg="saveOrg"
+          @createOrg="createOrg"
+          @deleteOrg="deleteOrg"
           :pageSize="30"
         />
       </template>

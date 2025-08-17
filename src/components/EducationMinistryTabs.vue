@@ -18,7 +18,7 @@
       <LoadingBar />
     </div>
 
-    <!-- Контент вкладок -->
+    <!-- Муниципальные ОО -->
     <div class="tab-content" v-else-if="activeTab === 'municipal'">
       <OrganizationTable
         v-model:columnWidths="tableProps.columnWidths"
@@ -30,9 +30,12 @@
         :isOrgChanged="isOrgChanged"
         :pageSize="30"
         @saveOrg="saveOrg"
+        @createOrg="(draft) => createOrg(draft, 'municipal')"
+        @deleteOrg="deleteOrg"
       />
     </div>
 
+    <!-- Коррекционные ОО -->
     <div class="tab-content" v-else-if="activeTab === 'correctional'">
       <OrganizationTable
         v-model:columnWidths="tableProps.columnWidths"
@@ -44,9 +47,12 @@
         :isOrgChanged="isOrgChanged"
         :pageSize="30"
         @saveOrg="saveOrg"
+        @createOrg="(draft) => createOrg(draft, 'correctional')"
+        @deleteOrg="deleteOrg"
       />
     </div>
 
+    <!-- ПМПК -->
     <div class="tab-content" v-else-if="activeTab === 'pmpk'">
       <OrganizationTable
         v-model:columnWidths="tableProps.columnWidths"
@@ -58,6 +64,8 @@
         :isOrgChanged="isOrgChanged"
         :pageSize="30"
         @saveOrg="saveOrg"
+        @createOrg="(draft) => createOrg(draft, 'pmpk')"
+        @deleteOrg="deleteOrg"
       />
     </div>
   </div>
@@ -67,15 +75,15 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import OrganizationTable from './AdminProfile/OrganizationTable.vue'
 import LoadingBar from './AdminProfile/LoadingBar.vue'
-import { API_BASE } from '@/apiBase' // ← единая база API
+import { API_BASE } from '@/apiBase'
 
 const props = defineProps({ search: { type: String, default: '' } })
 const emit = defineEmits(['count'])
 
 /* ----- таблица ----- */
 const tableProps = reactive({
-  //            ID  Кратк  Полное  Адрес  Коорд Тел   Сайт  Возр СВО  Дост Проф  Услуги  Спец  Кноп
-  columnWidths: [48, 250,   250,    210,   160,  150,  150,  80,  80,  80,  220,  400,  350,  100],
+  //            ID  Кратк  Полное  Адрес  Коорд  Тел   Сайт  Возр  СВО  Дост  Проф  Услуги  Спец  Действия
+  columnWidths: [48, 250, 250, 210, 160, 150, 150, 80, 80, 80, 220, 400, 350, 120],
   profileOptions: [],
   serviceOptions: [],
   specialistOptions: [],
@@ -113,10 +121,8 @@ const parseCoords = (input) => {
 }
 
 function getToken() {
-  // основной ключ:
   return (
     localStorage.getItem('user_token') ||
-    // обратная совместимость со старыми ключами:
     localStorage.getItem('token') ||
     localStorage.getItem('authToken') ||
     localStorage.getItem('auth_token') ||
@@ -131,7 +137,6 @@ const authHeaders = () => {
 }
 
 function normalizeOrg(org) {
-  // coords -> строка
   const coords = (() => {
     const c = org.coords
     if (Array.isArray(c)) return c.filter(v => v != null).join(', ')
@@ -142,11 +147,8 @@ function normalizeOrg(org) {
     }
     return (c ?? '').toString()
   })()
-
-  // Нормализуем в 'да' | 'нет'
   const svo = N(org.svo) === 'да' ? 'да' : 'нет'
   const accessibility = N(org.accessibility) === 'да' ? 'да' : 'нет'
-
   return {
     ...org,
     id: org._id || org.id || Math.random().toString(36).slice(2),
@@ -200,7 +202,6 @@ watch([activeTab, municipalFiltered, correctionalFiltered, pmpkFiltered], () => 
 
 /* ----- change detection и save ----- */
 const origFP = ref({}) // id -> fingerprint
-
 const comparable = (org) => ({
   name: N(org.name),
   full_name: N(org.full_name),
@@ -215,14 +216,98 @@ const comparable = (org) => ({
   services: toArr(org.services).map(N).sort(),
   specialists: toArr(org.specialists).map(N).sort(),
 })
-
 const fp = (o) => JSON.stringify(o)
 const setOrigFingerprint = (org) => { origFP.value[org.id] = fp(comparable(org)) }
-
 function isOrgChanged(_idx, org) {
   const orig = origFP.value[org.id]
   if (orig == null) return false
   return fp(comparable(org)) !== orig
+}
+
+/* ----- API: create / delete / save ----- */
+const TAB_TO_POD = {
+  municipal:    'Муниципальные ОО',
+  correctional: 'Коррекционные ОО',
+  pmpk:         'ПМПК',
+}
+
+async function createOrg(draft, tabKey) {
+  const token = getToken()
+  if (!token) { alert('Нет токена ведомственного админа (user_token).'); return }
+
+  try {
+    const payload = {
+      name: draft.name ?? '',
+      full_name: draft.full_name ?? '',
+      address: draft.address ?? '',
+      coords: parseCoords(draft.coords),
+      phone: draft.phone ?? '',
+      website: draft.website ?? '',
+      ageGroups: draft.ageGroups || [],
+      svo: N(draft.svo) === 'да' ? 'да' : 'нет',
+      accessibility: N(draft.accessibility) === 'да' ? 'да' : 'нет',
+      profile: draft.profile || [],
+      services: draft.services || [],
+      specialists: draft.specialists || [],
+      department: 'Министерство просвещения Р.Б.',
+      podvedomstva: TAB_TO_POD[tabKey] || 'Муниципальные ОО',
+    }
+
+    const res = await fetch(`${API_BASE}/ministry-admin/organization`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${t || res.statusText}`)
+    }
+    const created = await res.json()
+    const normalized = normalizeOrg({ ...created, podvedomstva: payload.podvedomstva })
+
+    // В соответствующую вкладку — наверх списка
+    if (tabKey === 'municipal') {
+      municipalOrgs.value = [normalized, ...municipalOrgs.value]
+    } else if (tabKey === 'correctional') {
+      correctionalOrgs.value = [normalized, ...correctionalOrgs.value]
+    } else {
+      pmpkOrgs.value = [normalized, ...pmpkOrgs.value]
+    }
+    setOrigFingerprint(normalized)
+  } catch (e) {
+    alert('Не удалось создать: ' + (e.message || e))
+  }
+}
+
+async function deleteOrg(org) {
+  if (!org) return
+  if (!confirm(`Удалить организацию «${org.name || '(без названия)'}»?`)) return
+
+  const token = getToken()
+  if (!token) { alert('Нет токена ведомственного админа (user_token).'); return }
+
+  try {
+    const id = org._id || org.id
+    if (!id) throw new Error('Нет ID организации')
+    const res = await fetch(`${API_BASE}/ministry-admin/organization/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { ...authHeaders() },
+    })
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${t || res.statusText}`)
+    }
+
+    const b = bucketKey(org)
+    const byId = x => String(x._id || x.id) !== String(id)
+    if (b === 'municipal') municipalOrgs.value = municipalOrgs.value.filter(byId)
+    else if (b === 'correctional') correctionalOrgs.value = correctionalOrgs.value.filter(byId)
+    else if (b === 'pmpk') pmpkOrgs.value = pmpkOrgs.value.filter(byId)
+
+    delete origFP.value[String(id)]
+  } catch (e) {
+    alert('Не удалось удалить: ' + (e.message || e))
+  }
 }
 
 async function saveOrg(org) {
@@ -249,8 +334,8 @@ async function saveOrg(org) {
       profile: toArr(org.profile),
       services: toArr(org.services),
       specialists: toArr(org.specialists),
-      department: org.department,
-      podvedomstva: org.podvedomstva ?? org.podvedomstvo,
+      department: 'Министерство просвещения Р.Б.',
+      podvedomstva: org.podvedomstva ?? org.podvedomstvo, // сохраняем текущее подведомство
     }
 
     const res = await fetch(`${API_BASE}/ministry-admin/organization/${encodeURIComponent(id)}`, {
@@ -263,7 +348,7 @@ async function saveOrg(org) {
       throw new Error(`HTTP ${res.status}: ${t || res.statusText}`)
     }
 
-    setOrigFingerprint(org) // успех — погасить кнопку
+    setOrigFingerprint(org) // погасить кнопку "Сохранить"
   } catch (e) {
     alert('Не удалось сохранить: ' + (e.message || e))
   }
